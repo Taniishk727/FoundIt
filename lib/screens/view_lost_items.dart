@@ -13,13 +13,17 @@ class ViewLostItems extends StatelessWidget {
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('lost_items')
-            //.where('status', isEqualTo: 'open')
-            //.orderBy('created_at', descending: true)
+            .where('status', isEqualTo: 'open')
+            .orderBy('created_at', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
+          if (snapshot.connectionState == ConnectionState.waiting) {
+              return Center(child: CircularProgressIndicator());
+            }
+          // if (!snapshot.hasData) {
+          //       return const Center(child: Text("No items found"));
+          //   }
+
 
           final items = snapshot.data!.docs;
 
