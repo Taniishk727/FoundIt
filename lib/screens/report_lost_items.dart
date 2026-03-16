@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:lost_found_app/screens/view_lost_items.dart';
 
 class ReportLostItem extends StatefulWidget {
@@ -17,6 +18,14 @@ class _ReportLostItemState extends State<ReportLostItem> {
   String selectedCategory = "Other";
 
   void submitItem(BuildContext context) async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please log in to report items")),
+      );
+      return;
+    }
+
     if (titleController.text.trim().isEmpty ||
         locationController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -32,6 +41,7 @@ class _ReportLostItemState extends State<ReportLostItem> {
       'category': selectedCategory,
       'status': 'open',
       'created_at': FieldValue.serverTimestamp(),
+      'reportedBy': currentUser.uid,
     });
 
     Navigator.pushReplacement(

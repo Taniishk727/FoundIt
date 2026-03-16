@@ -3,7 +3,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'screens/report_lost_items.dart';
-import 'screens/view_lost_items.dart';
 import 'screens/auth/login_screen.dart';
 
 void main() async {
