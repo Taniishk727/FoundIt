@@ -8,29 +8,26 @@ import 'screens/auth/login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const MyApp());
 }
+
 void addTestItem() async {
   await FirebaseFirestore.instance.collection('lost_items').add({
     'title': 'Test Wallet',
     'description': 'Black wallet near library',
     'location': 'Library',
-    'status': 'open'
+    'status': 'open',
   });
 }
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Lost & Found',
-      home: LoginScreen(),    
-    );
+    return MaterialApp(title: 'Lost & Found', home: LoginScreen());
   }
 }
 
@@ -112,14 +109,14 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-  onPressed: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => ReportLostItem()),
-      );
-    },
-  child: const Icon(Icons.add),
-  ),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => ReportLostItem()),
+          );
+        },
+        child: const Icon(Icons.add),
+      ),
     );
   }
 }

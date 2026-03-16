@@ -10,42 +10,39 @@ class LoginScreen extends StatelessWidget {
   final TextEditingController passwordController = TextEditingController();
 
   bool isValidStudentId(String id) {
-  final regex = RegExp(r'^SF\d{2}IT\d{3}$');
-  return regex.hasMatch(id);
-   }
-
+    final regex = RegExp(r'^SF\d{2}IT\d{3}$');
+    return regex.hasMatch(id);
+  }
 
   Future<void> loginUser(BuildContext context) async {
-  String studentId = studentIdController.text.trim();
-  String password = passwordController.text.trim();
+    String studentId = studentIdController.text.trim();
+    String password = passwordController.text.trim();
 
-  if (!isValidStudentId(studentId)) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Invalid Student ID format")),
-    );
-    return;
+    if (!isValidStudentId(studentId)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Invalid Student ID format")),
+      );
+      return;
+    }
+
+    String email = "${studentId.toLowerCase()}@campus.local";
+
+    try {
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => ViewLostItems()),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Login failed")));
+    }
   }
-
-  String email = "${studentId.toLowerCase()}@campus.local";
-
-  try {
-    await FirebaseAuth.instance.signInWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => ViewLostItems()),
-    );
-
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Login failed")),
-    );
-  }
-}
-
 
   @override
   Widget build(BuildContext context) {
@@ -55,7 +52,6 @@ class LoginScreen extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-
             TextField(
               controller: studentIdController,
               decoration: const InputDecoration(
@@ -69,18 +65,16 @@ class LoginScreen extends StatelessWidget {
             TextField(
               controller: passwordController,
               obscureText: true,
-              decoration: const InputDecoration(
-                labelText: "Password",
-              ),
+              decoration: const InputDecoration(labelText: "Password"),
             ),
 
             const SizedBox(height: 30),
 
             ElevatedButton(
-                onPressed: () {
+              onPressed: () {
                 loginUser(context);
-                },
-               child: const Text("Login"),
+              },
+              child: const Text("Login"),
             ),
             const SizedBox(height: 20),
 
@@ -88,13 +82,11 @@ class LoginScreen extends StatelessWidget {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => RegisterScreen(),
-                  ),
+                  MaterialPageRoute(builder: (context) => RegisterScreen()),
                 );
               },
               child: const Text("Create Account"),
-            )
+            ),
           ],
         ),
       ),
