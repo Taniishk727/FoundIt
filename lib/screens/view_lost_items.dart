@@ -83,6 +83,20 @@ class _ViewLostItemsState extends State<ViewLostItems> {
     messageController.dispose();
     if (submittedMessage == null) return;
 
+    final itemSnap = await FirebaseFirestore.instance
+        .collection('lost_items')
+        .doc(itemId)
+        .get();
+    final itemData = itemSnap.data();
+    final itemStatus = (itemData?['status'] ?? '').toString();
+    if (itemStatus != 'open') {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Already claimed")),
+      );
+      return;
+    }
+
     await FirebaseFirestore.instance.collection('claims').add({
       'itemId': itemId,
       'itemTitle': itemTitle,
@@ -246,8 +260,11 @@ class _ViewLostItemsState extends State<ViewLostItems> {
                         title: (data['title'] ?? 'No title').toString(),
                         location: (data['location'] ?? 'Unknown location').toString(),
                         category: (data['category'] ?? 'Other').toString(),
-                        showClaimButton: !AppRole.isAdmin &&
-                            (data['status']?.toString() == 'open'),
+                        showClaimButton: !AppRole.isAdmin,
+                        claimButtonEnabled: (data['status']?.toString() == 'open'),
+                        claimButtonText: (data['status']?.toString() == 'open')
+                            ? 'Claim'
+                            : 'Already Claimed',
                         onClaimPressed: () {
                           _showClaimDialog(
                             context: context,

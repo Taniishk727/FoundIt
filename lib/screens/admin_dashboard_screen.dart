@@ -24,24 +24,49 @@ class AdminDashboardScreen extends StatelessWidget {
       return;
     }
 
-    final itemRef = FirebaseFirestore.instance.collection('lost_items').doc(itemId);
+    final itemRef =
+        FirebaseFirestore.instance.collection('lost_items').doc(itemId);
 
-    final batch = FirebaseFirestore.instance.batch();
-    batch.update(claimRef, {'status': 'accepted'});
-    batch.update(itemRef, {'status': 'claimed'});
+    try {
+      await FirebaseFirestore.instance.runTransaction((tx) async {
+        final itemSnap = await tx.get(itemRef);
+        if (!itemSnap.exists) {
+          throw StateError('Item not found');
+        }
 
-    final otherPending = await FirebaseFirestore.instance
-        .collection('claims')
-        .where('itemId', isEqualTo: itemId)
-        .where('status', isEqualTo: 'pending')
-        .get();
+        final itemData = itemSnap.data() as Map<String, dynamic>;
+        final itemStatus = (itemData['status'] ?? '').toString();
+        if (itemStatus != 'open') {
+          throw StateError('Item already claimed');
+        }
 
-    for (final doc in otherPending.docs) {
-      if (doc.reference.path == claimRef.path) continue;
-      batch.update(doc.reference, {'status': 'rejected'});
+        final claimSnap = await tx.get(claimRef);
+        if (!claimSnap.exists) {
+          throw StateError('Claim not found');
+        }
+
+        // Lock item + accept selected claim.
+        tx.update(itemRef, {'status': 'claimed'});
+        tx.update(claimRef, {'status': 'accepted'});
+
+        // Reject all other claims for this item.
+        final otherClaims = await FirebaseFirestore.instance
+            .collection('claims')
+            .where('itemId', isEqualTo: itemId)
+            .get();
+
+        for (final doc in otherClaims.docs) {
+          if (doc.reference.path == claimRef.path) continue;
+          tx.update(doc.reference, {'status': 'rejected'});
+        }
+      });
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Accept failed: ${e.toString()}')),
+      );
+      return;
     }
-
-    await batch.commit();
 
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(

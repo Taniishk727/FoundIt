@@ -5,6 +5,8 @@ class ItemCard extends StatelessWidget {
   final String location;
   final String category;
   final bool showClaimButton;
+  final bool claimButtonEnabled;
+  final String claimButtonText;
   final VoidCallback? onClaimPressed;
 
   const ItemCard({
@@ -13,6 +15,8 @@ class ItemCard extends StatelessWidget {
     required this.location,
     required this.category,
     this.showClaimButton = true,
+    this.claimButtonEnabled = true,
+    this.claimButtonText = 'Claim',
     this.onClaimPressed,
   });
 
@@ -91,12 +95,12 @@ class ItemCard extends StatelessWidget {
               alignment: Alignment.center,
               child: showClaimButton
                   ? FilledButton.tonal(
-                      onPressed: onClaimPressed,
+                      onPressed: claimButtonEnabled ? onClaimPressed : null,
                       style: FilledButton.styleFrom(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         minimumSize: const Size(0, 36),
                       ),
-                      child: const Text("Claim"),
+                      child: Text(claimButtonText),
                     )
                   : const SizedBox.shrink(),
             ),
