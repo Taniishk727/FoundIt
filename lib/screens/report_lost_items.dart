@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:lost_found_app/screens/view_lost_items.dart';
+import '../../widgets/custom_text_field.dart';
+import '../../widgets/primary_button.dart';
 
 class ReportLostItem extends StatefulWidget {
   const ReportLostItem({super.key});
@@ -14,8 +15,19 @@ class _ReportLostItemState extends State<ReportLostItem> {
   final titleController = TextEditingController();
   final descriptionController = TextEditingController();
   final locationController = TextEditingController();
-
+  
   String selectedCategory = "Other";
+  bool _isLoading = false;
+
+  final List<String> categories = [
+    "Phone",
+    "Wallet",
+    "ID Card",
+    "Bag",
+    "Electronics",
+    "Keys",
+    "Other",
+  ];
 
   void submitItem(BuildContext context) async {
     final currentUser = FirebaseAuth.instance.currentUser;
@@ -26,91 +38,132 @@ class _ReportLostItemState extends State<ReportLostItem> {
       return;
     }
 
-    if (titleController.text.trim().isEmpty ||
-        locationController.text.trim().isEmpty) {
+    if (titleController.text.trim().isEmpty || locationController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please fill in title and location")),
+        const SnackBar(content: Text("Please fill in the title and location")),
       );
       return;
     }
 
-    await FirebaseFirestore.instance.collection('lost_items').add({
-      'title': titleController.text,
-      'description': descriptionController.text,
-      'location': locationController.text,
-      'category': selectedCategory,
-      'status': 'open',
-      'created_at': FieldValue.serverTimestamp(),
-      'reportedBy': currentUser.uid,
+    setState(() {
+      _isLoading = true;
     });
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const ViewLostItems()),
-    );
+    try {
+      await FirebaseFirestore.instance.collection('lost_items').add({
+        'title': titleController.text.trim(),
+        'description': descriptionController.text.trim(),
+        'location': locationController.text.trim(),
+        'category': selectedCategory,
+        'status': 'open',
+        'created_at': FieldValue.serverTimestamp(),
+        'reportedBy': currentUser.uid,
+      });
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Item reported successfully")),
+      );
+
+      // Clear the form after submission
+      titleController.clear();
+      descriptionController.clear();
+      locationController.clear();
+      setState(() {
+        selectedCategory = "Other";
+      });
+      
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error reporting item: $e")),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Report Lost Item")),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
+      appBar: AppBar(title: const Text("Report Item")),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24.0),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            TextField(
+            Text(
+              "Found or Lost something?",
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              "Provide details below to help returning it.",
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 32),
+            
+            CustomTextField(
               controller: titleController,
-              decoration: const InputDecoration(labelText: "Title"),
+              labelText: "Item Title",
+              hintText: "e.g., Black Leather Wallet",
+              prefixIcon: const Icon(Icons.title),
             ),
-
-            TextField(
-              controller: descriptionController,
-              decoration: const InputDecoration(labelText: "Description"),
-            ),
-
-            TextField(
-              controller: locationController,
-              decoration: const InputDecoration(labelText: "Location"),
-            ),
-
-            const SizedBox(height: 20),
-
-            DropdownButtonFormField<String>(
-              decoration: const InputDecoration(
-                labelText: "Category",
-                border: OutlineInputBorder(),
+            
+            const SizedBox(height: 8),
+            Text("Category", style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFDEE2E6)),
               ),
-              value: selectedCategory,
-              items:
-                  [
-                    "Phone",
-                    "Wallet",
-                    "ID Card",
-                    "Bag",
-                    "Electronics",
-                    "Keys",
-                    "Other",
-                  ].map((category) {
-                    return DropdownMenuItem(
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: selectedCategory,
+                  isExpanded: true,
+                  icon: const Icon(Icons.keyboard_arrow_down),
+                  items: categories.map((String category) {
+                    return DropdownMenuItem<String>(
                       value: category,
                       child: Text(category),
                     );
                   }).toList(),
-              onChanged: (value) {
-                if (value == null) return;
-                setState(() {
-                  selectedCategory = value;
-                });
-              },
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      selectedCategory = newValue!;
+                    });
+                  },
+                ),
+              ),
             ),
-
-            const SizedBox(height: 20),
-
-            ElevatedButton(
-              onPressed: () {
-                submitItem(context);
-              },
-              child: const Text("Submit"),
+            
+            const SizedBox(height: 24),
+            CustomTextField(
+              controller: locationController,
+              labelText: "Location found/lost",
+              hintText: "e.g., Library 2nd Floor",
+              prefixIcon: const Icon(Icons.location_on_outlined),
+            ),
+            
+            CustomTextField(
+              controller: descriptionController,
+              labelText: "Description (Optional)",
+              hintText: "Any identifying details...",
+              maxLines: 4,
+            ),
+            
+            const SizedBox(height: 32),
+            PrimaryButton(
+              text: "Submit Report",
+              isLoading: _isLoading,
+              onPressed: () => submitItem(context),
             ),
           ],
         ),

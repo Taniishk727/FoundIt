@@ -10,7 +10,6 @@ class ClaimsRequestsScreen extends StatelessWidget {
   Stream<QuerySnapshot> _claimsStream() {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
-      // Empty stream if not logged in; UI will handle this case separately.
       return const Stream<QuerySnapshot>.empty();
     }
 
@@ -58,12 +57,23 @@ class ClaimsRequestsScreen extends StatelessWidget {
           final claims = snapshot.data?.docs ?? const [];
 
           if (claims.isEmpty) {
-            return const Center(
-              child: Text('No claim requests found.'),
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.inbox_outlined, size: 64, color: Colors.grey[400]),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No claim requests found',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.grey[600]),
+                  ),
+                ],
+              ),
             );
           }
 
           return ListView.builder(
+            padding: const EdgeInsets.only(top: 8, bottom: 24),
             itemCount: claims.length,
             itemBuilder: (context, index) {
               final doc = claims[index];
@@ -71,54 +81,107 @@ class ClaimsRequestsScreen extends StatelessWidget {
 
               final status = (data['status'] ?? 'pending').toString();
               final message = (data['message'] ?? '').toString();
-              final itemTitle =
-                  (data['itemTitle'] ?? 'Unknown item').toString();
-
-              final timestamp = data['timestamp'];
-              String timestampText = 'Pending…';
-              if (timestamp is Timestamp) {
-                timestampText = timestamp.toDate().toString();
+              final itemTitle = (data['itemTitle'] ?? 'Unknown item').toString();
+              
+              String timestampText = 'Pending...';
+              if (data['timestamp'] is Timestamp) {
+                final date = (data['timestamp'] as Timestamp).toDate();
+                
+                final String ampm = date.hour >= 12 ? 'PM' : 'AM';
+                final int hour = date.hour > 12 ? date.hour - 12 : (date.hour == 0 ? 12 : date.hour);
+                final String minute = date.minute.toString().padLeft(2, '0');
+                
+                timestampText = '${date.month}/${date.day}/${date.year} - $hour:$minute $ampm';
               }
 
               final isPending = status == 'pending';
+              
+              Color statusColor = Colors.grey;
+              if (status == 'approved') statusColor = Colors.green;
+              if (status == 'rejected') statusColor = Colors.red;
+              if (status == 'pending') statusColor = Theme.of(context).primaryColor;
 
               return Card(
-                margin:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 child: Padding(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(16.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Item: $itemTitle',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                          )),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              itemTitle,
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: statusColor.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              status.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: statusColor,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(Icons.schedule, size: 14, color: Colors.grey),
+                          const SizedBox(width: 4),
+                          Text(
+                            timestampText,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 24),
+                      Text(
+                        "Claimant Message:",
+                        style: Theme.of(context).textTheme.labelMedium?.copyWith(color: Colors.grey[600]),
+                      ),
                       const SizedBox(height: 4),
-                      Text('Message: $message'),
-                      const SizedBox(height: 4),
-                      Text('Status: $status'),
-                      const SizedBox(height: 4),
-                      Text('Time: $timestampText'),
+                      Text(
+                        message,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.4),
+                      ),
                       if (isPending) ...[
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 16),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
                             TextButton(
                               onPressed: () async {
-                                await doc.reference
-                                    .update({'status': 'approved'});
+                                await doc.reference.update({'status': 'rejected'});
                               },
-                              child: const Text('Approve'),
+                              style: TextButton.styleFrom(foregroundColor: Colors.red),
+                              child: const Text('Reject'),
                             ),
                             const SizedBox(width: 8),
-                            TextButton(
+                            FilledButton(
                               onPressed: () async {
-                                await doc.reference
-                                    .update({'status': 'rejected'});
+                                await doc.reference.update({'status': 'approved'});
+                                
+                                // Ideally, we'd also mark the item as 'closed' here
+                                if (data['itemId'] != null) {
+                                  await FirebaseFirestore.instance
+                                      .collection('lost_items')
+                                      .doc(data['itemId'])
+                                      .update({'status': 'closed'});
+                                }
                               },
-                              child: const Text('Reject'),
+                              style: FilledButton.styleFrom(backgroundColor: Colors.green),
+                              child: const Text('Approve Claim'),
                             ),
                           ],
                         ),
@@ -134,4 +197,3 @@ class ClaimsRequestsScreen extends StatelessWidget {
     );
   }
 }
-
