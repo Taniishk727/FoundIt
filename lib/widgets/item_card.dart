@@ -4,16 +4,16 @@ class ItemCard extends StatelessWidget {
   final String title;
   final String location;
   final String category;
-  final String reporterId;
-  final VoidCallback onClaimPressed;
+  final bool showClaimButton;
+  final VoidCallback? onClaimPressed;
 
   const ItemCard({
     super.key,
     required this.title,
     required this.location,
     required this.category,
-    required this.reporterId,
-    required this.onClaimPressed,
+    this.showClaimButton = true,
+    this.onClaimPressed,
   });
 
   @override
@@ -89,14 +89,16 @@ class ItemCard extends StatelessWidget {
             const SizedBox(width: 8),
             Align(
               alignment: Alignment.center,
-              child: FilledButton.tonal(
-                onPressed: onClaimPressed,
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  minimumSize: const Size(0, 36),
-                ),
-                child: const Text("Claim"),
-              ),
+              child: showClaimButton
+                  ? FilledButton.tonal(
+                      onPressed: onClaimPressed,
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        minimumSize: const Size(0, 36),
+                      ),
+                      child: const Text("Claim"),
+                    )
+                  : const SizedBox.shrink(),
             ),
           ],
         ),

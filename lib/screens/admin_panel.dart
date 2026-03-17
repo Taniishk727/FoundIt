@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'auth/login_screen.dart';
+import 'package:lost_found_app/state/app_role.dart';
 
 class AdminPanel extends StatelessWidget {
   const AdminPanel({super.key});
@@ -48,29 +49,67 @@ class AdminPanel extends StatelessWidget {
             ),
             const SizedBox(height: 48),
             Text(
-              "System Overview (Admin)",
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              AppRole.isAdmin ? "System Overview (Admin)" : "Account",
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _StatCard(
-                    title: "Total Items",
-                    icon: Icons.inventory_2,
-                    stream: FirebaseFirestore.instance.collection('lost_items').snapshots(),
+            if (AppRole.isAdmin)
+              Row(
+                children: [
+                  Expanded(
+                    child: _StatCard(
+                      title: "Total Items",
+                      icon: Icons.inventory_2,
+                      stream: FirebaseFirestore.instance
+                          .collection('lost_items')
+                          .snapshots(),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _StatCard(
-                    title: "Active Claims",
-                    icon: Icons.inbox,
-                    stream: FirebaseFirestore.instance.collection('claims').where('status', isEqualTo: 'pending').snapshots(),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _StatCard(
+                      title: "Active Claims",
+                      icon: Icons.inbox,
+                      stream: FirebaseFirestore.instance
+                          .collection('claims')
+                          .where('status', isEqualTo: 'pending')
+                          .snapshots(),
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              )
+            else
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Role: ${AppRole.role.value ?? 'unknown'}',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _StatCard(
+                          title: "My Claims",
+                          icon: Icons.inbox_outlined,
+                          stream: FirebaseFirestore.instance
+                              .collection('claims')
+                              .where(
+                                'claimantId',
+                                isEqualTo:
+                                    FirebaseAuth.instance.currentUser?.uid ?? '',
+                              )
+                              .snapshots(),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
           ],
         ),
       ),

@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../widgets/item_card.dart';
 import 'item_detail_screen.dart';
+import 'package:lost_found_app/state/app_role.dart';
 
 class ViewLostItems extends StatefulWidget {
   const ViewLostItems({super.key});
@@ -30,7 +31,6 @@ class _ViewLostItemsState extends State<ViewLostItems> {
     required BuildContext context,
     required String itemId,
     required String itemTitle,
-    required String? reporterId,
   }) async {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
@@ -40,9 +40,9 @@ class _ViewLostItemsState extends State<ViewLostItems> {
       return;
     }
 
-    if (reporterId == null || reporterId.trim().isEmpty) {
+    if (AppRole.isAdmin) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("This item can’t be claimed yet (missing reporter)")),
+        const SnackBar(content: Text("Admins cannot claim items")),
       );
       return;
     }
@@ -87,7 +87,6 @@ class _ViewLostItemsState extends State<ViewLostItems> {
       'itemId': itemId,
       'itemTitle': itemTitle,
       'claimantId': currentUser.uid,
-      'reporterId': reporterId,
       'message': submittedMessage,
       'timestamp': FieldValue.serverTimestamp(),
       'status': 'pending',
@@ -247,13 +246,13 @@ class _ViewLostItemsState extends State<ViewLostItems> {
                         title: (data['title'] ?? 'No title').toString(),
                         location: (data['location'] ?? 'Unknown location').toString(),
                         category: (data['category'] ?? 'Other').toString(),
-                        reporterId: (data['reportedBy'] ?? '').toString(),
+                        showClaimButton: !AppRole.isAdmin &&
+                            (data['status']?.toString() == 'open'),
                         onClaimPressed: () {
                           _showClaimDialog(
                             context: context,
                             itemId: doc.id,
                             itemTitle: (data['title'] ?? "Item").toString(),
-                            reporterId: data['reportedBy'] as String?,
                           );
                         },
                       ),

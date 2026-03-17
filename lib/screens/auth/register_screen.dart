@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/primary_button.dart';
 import 'package:lost_found_app/screens/main_navbar.dart';
+import 'package:lost_found_app/state/app_role.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -60,6 +61,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
         email: email,
         password: password,
       );
+
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        await AppRole.ensureUserDoc(uid: currentUser.uid, email: currentUser.email ?? email);
+        await AppRole.loadForUid(currentUser.uid);
+      }
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

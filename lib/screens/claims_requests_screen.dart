@@ -14,11 +14,13 @@ class ClaimsRequestsScreen extends StatelessWidget {
     }
 
     Query query = FirebaseFirestore.instance
-        .collection('claims')
-        .where('reporterId', isEqualTo: currentUser.uid);
+        .collection('claims');
 
     if (itemId != null && itemId!.trim().isNotEmpty) {
       query = query.where('itemId', isEqualTo: itemId);
+    } else {
+      // Default view: show *my* claim requests (claimant view)
+      query = query.where('claimantId', isEqualTo: currentUser.uid);
     }
 
     return query.orderBy('timestamp', descending: true).snapshots();
@@ -39,7 +41,7 @@ class ClaimsRequestsScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(itemId == null ? 'Claim Requests' : 'Claims for Item'),
+        title: Text(itemId == null ? 'My Claims' : 'Claims for Item'),
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: _claimsStream(),
@@ -97,7 +99,7 @@ class ClaimsRequestsScreen extends StatelessWidget {
               final isPending = status == 'pending';
               
               Color statusColor = Colors.grey;
-              if (status == 'approved') statusColor = Colors.green;
+              if (status == 'accepted' || status == 'approved') statusColor = Colors.green;
               if (status == 'rejected') statusColor = Colors.red;
               if (status == 'pending') statusColor = Theme.of(context).primaryColor;
 
@@ -156,34 +158,10 @@ class ClaimsRequestsScreen extends StatelessWidget {
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.4),
                       ),
                       if (isPending) ...[
-                        const SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            TextButton(
-                              onPressed: () async {
-                                await doc.reference.update({'status': 'rejected'});
-                              },
-                              style: TextButton.styleFrom(foregroundColor: Colors.red),
-                              child: const Text('Reject'),
-                            ),
-                            const SizedBox(width: 8),
-                            FilledButton(
-                              onPressed: () async {
-                                await doc.reference.update({'status': 'approved'});
-                                
-                                // Ideally, we'd also mark the item as 'closed' here
-                                if (data['itemId'] != null) {
-                                  await FirebaseFirestore.instance
-                                      .collection('lost_items')
-                                      .doc(data['itemId'])
-                                      .update({'status': 'closed'});
-                                }
-                              },
-                              style: FilledButton.styleFrom(backgroundColor: Colors.green),
-                              child: const Text('Approve Claim'),
-                            ),
-                          ],
+                        const SizedBox(height: 12),
+                        Text(
+                          'This request is pending review.',
+                          style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ],
                     ],

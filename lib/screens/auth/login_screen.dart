@@ -4,6 +4,7 @@ import '../../widgets/custom_text_field.dart';
 import '../../widgets/primary_button.dart';
 import 'register_screen.dart';
 import 'package:lost_found_app/screens/main_navbar.dart';
+import 'package:lost_found_app/state/app_role.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -51,6 +52,8 @@ class _LoginScreenState extends State<LoginScreen> {
         email: email,
         password: password,
       );
+
+      await AppRole.loadForCurrentUser();
 
       if (!mounted) return;
       Navigator.pushReplacement(
