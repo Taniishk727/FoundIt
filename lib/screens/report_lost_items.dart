@@ -17,6 +17,7 @@ class _ReportLostItemState extends State<ReportLostItem> {
   final locationController = TextEditingController();
   
   String selectedCategory = "Other";
+  String selectedType = "lost"; // Default to lost
   bool _isLoading = false;
 
   final List<String> categories = [
@@ -55,6 +56,7 @@ class _ReportLostItemState extends State<ReportLostItem> {
         'description': descriptionController.text.trim(),
         'location': locationController.text.trim(),
         'category': selectedCategory,
+        'type': selectedType,
         'status': 'open',
         'created_at': FieldValue.serverTimestamp(),
         'reportedBy': currentUser.uid,
@@ -71,6 +73,7 @@ class _ReportLostItemState extends State<ReportLostItem> {
       locationController.clear();
       setState(() {
         selectedCategory = "Other";
+        selectedType = "lost";
       });
       
     } catch (e) {
@@ -105,6 +108,30 @@ class _ReportLostItemState extends State<ReportLostItem> {
               "Provide details below to help returning it.",
               style: Theme.of(context).textTheme.bodyMedium,
             ),
+            const SizedBox(height: 24),
+
+            // Segmented control for Type (Lost vs Found)
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment<String>(
+                  value: 'lost',
+                  label: Text('I Lost This'),
+                  icon: Icon(Icons.search_off),
+                ),
+                ButtonSegment<String>(
+                  value: 'found',
+                  label: Text('I Found This'),
+                  icon: Icon(Icons.domain_verification),
+                ),
+              ],
+              selected: {selectedType},
+              onSelectionChanged: (Set<String> newSelection) {
+                setState(() {
+                  selectedType = newSelection.first;
+                });
+              },
+            ),
+
             const SizedBox(height: 32),
             
             CustomTextField(

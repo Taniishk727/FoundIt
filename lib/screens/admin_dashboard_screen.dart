@@ -11,67 +11,87 @@ class AdminDashboardScreen extends StatelessWidget {
         .snapshots();
   }
 
-  Future<void> _acceptClaim({
+  Future<void> _approveClaim({
     required BuildContext context,
     required DocumentReference claimRef,
     required Map<String, dynamic> claimData,
   }) async {
-    final itemId = (claimData['itemId'] ?? '').toString();
-    if (itemId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid claim: missing itemId')),
-      );
-      return;
-    }
-
-    final itemRef =
-        FirebaseFirestore.instance.collection('lost_items').doc(itemId);
-
     try {
+      final String claimId = claimRef.id;
+
       await FirebaseFirestore.instance.runTransaction((tx) async {
-        final itemSnap = await tx.get(itemRef);
-        if (!itemSnap.exists) {
-          throw StateError('Item not found');
-        }
-
-        final itemData = itemSnap.data() as Map<String, dynamic>;
-        final itemStatus = (itemData['status'] ?? '').toString();
-        if (itemStatus != 'open') {
-          throw StateError('Item already claimed');
-        }
-
-        final claimSnap = await tx.get(claimRef);
+        // 1. Fetch claim document using claimId
+        final fetchedClaimRef = FirebaseFirestore.instance.collection('claims').doc(claimId);
+        final claimSnap = await tx.get(fetchedClaimRef);
+        
         if (!claimSnap.exists) {
           throw StateError('Claim not found');
         }
 
-        // Lock item + accept selected claim.
-        tx.update(itemRef, {'status': 'claimed'});
-        tx.update(claimRef, {'status': 'accepted'});
+        // 2. Extract: legacy itemId, foundItemId, lostItemId, claimantId
+        final extractedData = claimSnap.data() as Map<String, dynamic>;
+        final String? legacyItemId = extractedData['itemId']?.toString();
+        final String? foundItemId = (extractedData['foundItemId']?.toString() ?? legacyItemId);
+        final String? lostItemId = extractedData['lostItemId']?.toString();
+        final String? claimantId = extractedData['claimantId']?.toString();
 
-        // Reject all other claims for this item.
-        final otherClaims = await FirebaseFirestore.instance
-            .collection('claims')
-            .where('itemId', isEqualTo: itemId)
-            .get();
+        if (foundItemId == null || foundItemId.isEmpty || claimantId == null || claimantId.isEmpty) {
+          throw StateError('Invalid claim data');
+        }
 
-        for (final doc in otherClaims.docs) {
-          if (doc.reference.path == claimRef.path) continue;
-          tx.update(doc.reference, {'status': 'rejected'});
+        // 3. Fetch found item
+        final foundItemRef = FirebaseFirestore.instance.collection('lost_items').doc(foundItemId);
+        final foundItemSnap = await tx.get(foundItemRef);
+        if (!foundItemSnap.exists) {
+          throw StateError('Found item not found');
+        }
+        final fData = foundItemSnap.data() as Map<String, dynamic>;
+        if (fData['status']?.toString() != 'open') {
+          throw StateError('Found item already claimed or not open');
+        }
+
+        // 4. Fetch lost item if linked
+        DocumentReference? lostItemRef;
+        DocumentSnapshot? lostItemSnap;
+        if (lostItemId != null && lostItemId.isNotEmpty) {
+          lostItemRef = FirebaseFirestore.instance.collection('lost_items').doc(lostItemId);
+          lostItemSnap = await tx.get(lostItemRef);
+          if (lostItemSnap.exists) {
+            final lData = lostItemSnap.data() as Map<String, dynamic>;
+            if (lData['status']?.toString() != 'open') {
+              throw StateError('Linked lost item is not open');
+            }
+          }
+        }
+
+        // 5. Update claim: status = "approved"
+        tx.update(fetchedClaimRef, {'status': 'approved'});
+
+        // 6. Update found item
+        tx.update(foundItemRef, {
+          'status': 'claimed',
+          'claimedBy': claimantId,
+        });
+
+        // 7. Update lost item (if found)
+        if (lostItemRef != null && lostItemSnap != null && lostItemSnap.exists) {
+          tx.update(lostItemRef, {
+            'status': 'claimed',
+            'claimedBy': claimantId,
+          });
         }
       });
+
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Claim approved successfully')),
+      );
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Accept failed: ${e.toString()}')),
+        SnackBar(content: Text('Approve failed: ${e.toString()}')),
       );
-      return;
     }
-
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Claim accepted')),
-    );
   }
 
   Future<void> _rejectClaim({
@@ -159,12 +179,12 @@ class AdminDashboardScreen extends StatelessWidget {
                             ),
                             const SizedBox(width: 8),
                             FilledButton(
-                              onPressed: () => _acceptClaim(
+                              onPressed: () => _approveClaim(
                                 context: context,
                                 claimRef: doc.reference,
                                 claimData: data,
                               ),
-                              child: const Text('Accept'),
+                              child: const Text('Approve'),
                             ),
                           ],
                         ),
