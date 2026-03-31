@@ -15,6 +15,8 @@ class ViewLostItems extends StatefulWidget {
 class _ViewLostItemsState extends State<ViewLostItems> {
   String selectedCategory = "All";
   String searchQuery = "";
+  final Set<String> _claimingItemIds = {};
+  final Set<String> _claimedItemIds = {};
 
   final List<String> categories = [
     "All",
@@ -27,11 +29,13 @@ class _ViewLostItemsState extends State<ViewLostItems> {
     "Other",
   ];
 
-  Future<void> _showClaimDialog({
-    required BuildContext context,
-    required String itemId,
+  Future<void> _handleClaim({
+    required String foundItemId,
+    required String lostItemId,
     required String itemTitle,
   }) async {
+    if (!mounted) return;
+
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -47,171 +51,151 @@ class _ViewLostItemsState extends State<ViewLostItems> {
       return;
     }
 
-    // 1. Fetch user's reported lost items
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
-    );
-
-    late List<QueryDocumentSnapshot> lostItems;
-    try {
-      final querySnapshot = await FirebaseFirestore.instance
-          .collection('lost_items')
-          .where('reportedBy', isEqualTo: currentUser.uid)
-          .where('type', isEqualTo: 'lost')
-          .where('status', isEqualTo: 'open')
-          .get();
-      lostItems = querySnapshot.docs;
-    } catch (e) {
-      if (!context.mounted) return;
-      Navigator.pop(context); // hide loading
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error fetching your lost items: $e")),
-      );
-      return;
-    }
-
-    if (!context.mounted) return;
-    Navigator.pop(context); // hide loading
-
-    if (lostItems.isEmpty) {
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text("No Lost Items"),
-          content: const Text(
-            "You have not reported any lost items. Please report your lost item first so we can link it to this found item."
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text("OK"),
-            )
-          ],
-        ),
-      );
-      return;
-    }
-
-    // 2. Select lost item dialog/bottom sheet
-    if (!context.mounted) return;
-    final selectedLostItemId = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.5,
-          minChildSize: 0.3,
-          maxChildSize: 0.8,
-          expand: false,
-          builder: (_, controller) {
-            return Column(
-              children: [
-                const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Text(
-                    "Select Your Lost Item",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const Divider(height: 1),
-                Expanded(
-                  child: ListView.builder(
-                    controller: controller,
-                    itemCount: lostItems.length,
-                    itemBuilder: (c, i) {
-                      final data = lostItems[i].data() as Map<String, dynamic>;
-                      return ListTile(
-                        leading: Icon(Icons.inventory_2_outlined, color: Theme.of(context).primaryColor),
-                        title: Text((data['title'] ?? 'Unknown').toString()),
-                        subtitle: Text((data['location'] ?? 'Unknown location').toString()),
-                        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                        onTap: () => Navigator.pop(ctx, lostItems[i].id),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-
-    if (selectedLostItemId == null) return;
-
-    // 3. Message dialog
-    if (!context.mounted) return;
-    final messageController = TextEditingController();
-    final submittedMessage = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text("Claim Item"),
-          content: TextField(
-            controller: messageController,
-            decoration: const InputDecoration(
-              labelText: "Why is this item yours?",
-              border: OutlineInputBorder(),
-            ),
-            minLines: 2,
-            maxLines: 5,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text("Cancel"),
-            ),
-            FilledButton(
-              onPressed: () {
-                final msg = messageController.text.trim();
-                if (msg.isEmpty) return;
-                Navigator.pop(dialogContext, msg);
-              },
-              child: const Text("Submit Request"),
-            ),
-          ],
-        );
-      },
-    );
-
-    messageController.dispose();
-    if (submittedMessage == null) return;
-
-    // 4. Verify found item is still open and create claim
-    final itemSnap = await FirebaseFirestore.instance
-        .collection('lost_items')
-        .doc(itemId)
-        .get();
-    
-    final itemData = itemSnap.data();
-    final itemStatus = (itemData?['status'] ?? '').toString();
-    if (itemStatus != 'open') {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Already claimed")),
-      );
-      return;
-    }
-
-    await FirebaseFirestore.instance.collection('claims').add({
-      'foundItemId': itemId,
-      'lostItemId': selectedLostItemId,
-      'itemTitle': itemTitle, // kept for backward compatibility with UI lists
-      'claimantId': currentUser.uid,
-      'message': submittedMessage,
-      'status': 'pending',
-      'timestamp': FieldValue.serverTimestamp(),
+    // Set loading immediately to prevent duplicate rapid clicks
+    setState(() {
+      _claimingItemIds.add(foundItemId);
     });
 
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Claim request sent successfully")),
-    );
+    try {
+      final existingClaims = await FirebaseFirestore.instance
+          .collection('claims')
+          .where('userId', isEqualTo: currentUser.uid)
+          .where('foundItemId', isEqualTo: foundItemId)
+          .get();
+          
+      if (!mounted) return;
+      
+      if (existingClaims.docs.isNotEmpty) {
+        await showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text("Duplicate Claim"),
+            content: const Text("You have already claimed this item."),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  if (ctx.mounted) {
+                    Navigator.pop(ctx);
+                  }
+                },
+                child: const Text("OK"),
+              )
+            ],
+          ),
+        );
+        return;
+      }
+
+      if (!mounted) return;
+      final messageController = TextEditingController();
+      final submittedMessage = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: const Text("Claim Item"),
+            content: TextField(
+              controller: messageController,
+              decoration: const InputDecoration(
+                labelText: "Why is this item yours?",
+                border: OutlineInputBorder(),
+              ),
+              minLines: 2,
+              maxLines: 5,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  if (dialogContext.mounted) {
+                    Navigator.pop(dialogContext);
+                  }
+                },
+                child: const Text("Cancel"),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final msg = messageController.text.trim();
+                  if (msg.isEmpty) return;
+                  if (dialogContext.mounted) {
+                    Navigator.pop(dialogContext, msg);
+                  }
+                },
+                child: const Text("Submit Request"),
+              ),
+            ],
+          );
+        },
+      );
+
+      // Delay disposal to allow popup closing animation to finish and avoid 'dependents.isEmpty' Framework errors
+      Future.delayed(const Duration(milliseconds: 500), () {
+        messageController.dispose();
+      });
+
+      if (submittedMessage == null) return;
+
+      if (!mounted) return;
+
+      await _createClaim(
+        foundItemId: foundItemId,
+        lostItemId: lostItemId,
+        itemTitle: itemTitle,
+        message: submittedMessage,
+        userId: currentUser.uid,
+      );
+
+      if (!mounted) return;
+      
+      setState(() {
+        _claimedItemIds.add(foundItemId);
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Claim request sent successfully")),
+      );
+    } catch (e) {
+      debugPrint("Claim Error: $e");
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e is StateError ? e.message : "Error submitting claim: $e")),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _claimingItemIds.remove(foundItemId);
+        });
+      }
+    }
+  }
+
+  Future<void> _createClaim({
+    required String foundItemId,
+    required String lostItemId,
+    required String itemTitle,
+    required String message,
+    required String userId,
+  }) async {
+    final itemRef = FirebaseFirestore.instance.collection('lost_items').doc(foundItemId);
+    await FirebaseFirestore.instance.runTransaction((tx) async {
+      final itemSnap = await tx.get(itemRef);
+      final itemData = itemSnap.data();
+      final itemStatus = (itemData?['status'] ?? '').toString();
+      
+      if (itemStatus != 'open') {
+        throw StateError("Item is no longer available for claiming.");
+      }
+
+      final newClaimRef = FirebaseFirestore.instance.collection('claims').doc();
+      tx.set(newClaimRef, {
+        'foundItemId': foundItemId,
+        'lostItemId': lostItemId,
+        'userId': userId,
+        'itemTitle': itemTitle,
+        'claimantId': userId,
+        'message': message,
+        'status': 'pending',
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+    });
   }
 
   Stream<QuerySnapshot> getItemsStream() {
@@ -297,12 +281,16 @@ class _ViewLostItemsState extends State<ViewLostItems> {
                 location: (data['location'] ?? 'Unknown location').toString(),
                 category: (data['category'] ?? 'Other').toString(),
                 showClaimButton: showClaim,
-                claimButtonEnabled: true,
-                claimButtonText: 'Claim',
-                onClaimPressed: () {
-                  _showClaimDialog(
-                    context: context,
-                    itemId: doc.id,
+                claimButtonEnabled: !_claimingItemIds.contains(doc.id) && !_claimedItemIds.contains(doc.id),
+                claimButtonText: _claimingItemIds.contains(doc.id) 
+                    ? 'Processing...' 
+                    : _claimedItemIds.contains(doc.id) 
+                        ? 'Claimed' 
+                        : 'Claim',
+                onClaimPressed: _claimingItemIds.contains(doc.id) || _claimedItemIds.contains(doc.id) ? null : () {
+                  _handleClaim(
+                    foundItemId: doc.id,
+                    lostItemId: (data['lostItemId'] ?? '').toString(),
                     itemTitle: (data['title'] ?? "Item").toString(),
                   );
                 },

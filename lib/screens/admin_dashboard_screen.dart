@@ -18,9 +18,23 @@ class AdminDashboardScreen extends StatelessWidget {
   }) async {
     try {
       final String claimId = claimRef.id;
+      final String? lostItemId = claimData['lostItemId']?.toString();
+      final String? claimantId = claimData['claimantId']?.toString();
+
+      if (lostItemId == null || lostItemId.isEmpty || claimantId == null || claimantId.isEmpty) {
+        throw StateError('Invalid claim data: missing lostItemId or claimantId');
+      }
+
+      // Pre-fetch all found items linked to this lost item
+      final foundItemsQuery = await FirebaseFirestore.instance
+          .collection('lost_items')
+          .where('type', isEqualTo: 'found')
+          .where('lostItemId', isEqualTo: lostItemId)
+          .where('status', isEqualTo: 'open')
+          .get();
 
       await FirebaseFirestore.instance.runTransaction((tx) async {
-        // 1. Fetch claim document using claimId
+        // 1. Fetch claim document
         final fetchedClaimRef = FirebaseFirestore.instance.collection('claims').doc(claimId);
         final claimSnap = await tx.get(fetchedClaimRef);
         
@@ -28,58 +42,39 @@ class AdminDashboardScreen extends StatelessWidget {
           throw StateError('Claim not found');
         }
 
-        // 2. Extract: legacy itemId, foundItemId, lostItemId, claimantId
-        final extractedData = claimSnap.data() as Map<String, dynamic>;
-        final String? legacyItemId = extractedData['itemId']?.toString();
-        final String? foundItemId = (extractedData['foundItemId']?.toString() ?? legacyItemId);
-        final String? lostItemId = extractedData['lostItemId']?.toString();
-        final String? claimantId = extractedData['claimantId']?.toString();
-
-        if (foundItemId == null || foundItemId.isEmpty || claimantId == null || claimantId.isEmpty) {
-          throw StateError('Invalid claim data');
+        // 2. Fetch lost item
+        final lostItemRef = FirebaseFirestore.instance.collection('lost_items').doc(lostItemId);
+        final lostItemSnap = await tx.get(lostItemRef);
+        if (!lostItemSnap.exists) {
+          throw StateError('Lost item not found');
+        }
+        final lData = lostItemSnap.data() as Map<String, dynamic>;
+        debugPrint('Item status before update (lostItem): ${lData['status']}');
+        if (lData['status']?.toString() != 'open') {
+          throw StateError('Lost item is already claimed or not open');
         }
 
-        // 3. Fetch found item
-        final foundItemRef = FirebaseFirestore.instance.collection('lost_items').doc(foundItemId);
-        final foundItemSnap = await tx.get(foundItemRef);
-        if (!foundItemSnap.exists) {
-          throw StateError('Found item not found');
-        }
-        final fData = foundItemSnap.data() as Map<String, dynamic>;
-        if (fData['status']?.toString() != 'open') {
-          throw StateError('Found item already claimed or not open');
-        }
+        // 3. Verify fetched found items within transaction (optional, but good for locks)
+        // We'll just perform the writes.
 
-        // 4. Fetch lost item if linked
-        DocumentReference? lostItemRef;
-        DocumentSnapshot? lostItemSnap;
-        if (lostItemId != null && lostItemId.isNotEmpty) {
-          lostItemRef = FirebaseFirestore.instance.collection('lost_items').doc(lostItemId);
-          lostItemSnap = await tx.get(lostItemRef);
-          if (lostItemSnap.exists) {
-            final lData = lostItemSnap.data() as Map<String, dynamic>;
-            if (lData['status']?.toString() != 'open') {
-              throw StateError('Linked lost item is not open');
-            }
-          }
-        }
-
-        // 5. Update claim: status = "approved"
+        // 4. Update claim: status = "approved"
         tx.update(fetchedClaimRef, {'status': 'approved'});
 
-        // 6. Update found item
-        tx.update(foundItemRef, {
+        // 5. Update lost item
+        tx.update(lostItemRef, {
           'status': 'claimed',
           'claimedBy': claimantId,
         });
 
-        // 7. Update lost item (if found)
-        if (lostItemRef != null && lostItemSnap != null && lostItemSnap.exists) {
-          tx.update(lostItemRef, {
+        // 6. Update ALL associated found items to hide them
+        for (var doc in foundItemsQuery.docs) {
+          tx.update(doc.reference, {
             'status': 'claimed',
             'claimedBy': claimantId,
           });
         }
+        
+        debugPrint('Claim approval status update: lostItemId=$lostItemId SUCCESS. Resolved ${foundItemsQuery.docs.length} found item(s).');
       });
 
       if (!context.mounted) return;
@@ -87,6 +82,7 @@ class AdminDashboardScreen extends StatelessWidget {
         const SnackBar(content: Text('Claim approved successfully')),
       );
     } catch (e) {
+      debugPrint('Claim approval update FAILURE: $e');
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Approve failed: ${e.toString()}')),

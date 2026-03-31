@@ -30,6 +30,9 @@ class _ReportLostItemState extends State<ReportLostItem> {
     "Other",
   ];
 
+  String? selectedLostItemId;
+  Map<String, dynamic>? selectedLostItemData;
+
   void submitItem(BuildContext context) async {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
@@ -39,11 +42,26 @@ class _ReportLostItemState extends State<ReportLostItem> {
       return;
     }
 
-    if (titleController.text.trim().isEmpty || locationController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please fill in the title and location")),
-      );
-      return;
+    if (selectedType == 'lost') {
+      if (titleController.text.trim().isEmpty || locationController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Please fill in the title and location")),
+        );
+        return;
+      }
+    } else {
+      if (selectedLostItemId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Please select what lost item you found")),
+        );
+        return;
+      }
+      if (locationController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Please fill in the location found")),
+        );
+        return;
+      }
     }
 
     setState(() {
@@ -51,16 +69,31 @@ class _ReportLostItemState extends State<ReportLostItem> {
     });
 
     try {
-      await FirebaseFirestore.instance.collection('lost_items').add({
-        'title': titleController.text.trim(),
-        'description': descriptionController.text.trim(),
-        'location': locationController.text.trim(),
-        'category': selectedCategory,
-        'type': selectedType,
-        'status': 'open',
-        'created_at': FieldValue.serverTimestamp(),
-        'reportedBy': currentUser.uid,
-      });
+      if (selectedType == 'lost') {
+        await FirebaseFirestore.instance.collection('lost_items').add({
+          'title': titleController.text.trim(),
+          'description': descriptionController.text.trim(),
+          'location': locationController.text.trim(),
+          'category': selectedCategory,
+          'type': 'lost',
+          'status': 'open',
+          'created_at': FieldValue.serverTimestamp(),
+          'reportedBy': currentUser.uid,
+        });
+      } else {
+        await FirebaseFirestore.instance.collection('lost_items').add({
+          'lostItemId': selectedLostItemId,
+          'finderId': currentUser.uid,
+          'reportedBy': currentUser.uid, // backward compat
+          'title': selectedLostItemData?['title'] ?? 'Unknown Found Item', // Inherit title for ui displays
+          'category': selectedLostItemData?['category'] ?? 'Other',
+          'location': locationController.text.trim(),
+          'description': descriptionController.text.trim(),
+          'type': 'found',
+          'status': 'open',
+          'created_at': FieldValue.serverTimestamp(),
+        });
+      }
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -74,6 +107,8 @@ class _ReportLostItemState extends State<ReportLostItem> {
       setState(() {
         selectedCategory = "Other";
         selectedType = "lost";
+        selectedLostItemId = null;
+        selectedLostItemData = null;
       });
       
     } catch (e) {
@@ -134,47 +169,117 @@ class _ReportLostItemState extends State<ReportLostItem> {
 
             const SizedBox(height: 32),
             
-            CustomTextField(
-              controller: titleController,
-              labelText: "Item Title",
-              hintText: "e.g., Black Leather Wallet",
-              prefixIcon: const Icon(Icons.title),
-            ),
-            
-            const SizedBox(height: 8),
-            Text("Category", style: Theme.of(context).textTheme.labelLarge),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFDEE2E6)),
+            if (selectedType == 'lost') ...[
+              CustomTextField(
+                controller: titleController,
+                labelText: "Item Title",
+                hintText: "e.g., Black Leather Wallet",
+                prefixIcon: const Icon(Icons.title),
               ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: selectedCategory,
-                  isExpanded: true,
-                  icon: const Icon(Icons.keyboard_arrow_down),
-                  items: categories.map((String category) {
-                    return DropdownMenuItem<String>(
-                      value: category,
-                      child: Text(category),
-                    );
-                  }).toList(),
-                  onChanged: (String? newValue) {
-                    setState(() {
-                      selectedCategory = newValue!;
-                    });
-                  },
+              
+              const SizedBox(height: 8),
+              Text("Category", style: Theme.of(context).textTheme.labelLarge),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFDEE2E6)),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: selectedCategory,
+                    isExpanded: true,
+                    icon: const Icon(Icons.keyboard_arrow_down),
+                    items: categories.map((String category) {
+                      return DropdownMenuItem<String>(
+                        value: category,
+                        child: Text(category),
+                      );
+                    }).toList(),
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        selectedCategory = newValue!;
+                      });
+                    },
+                  ),
                 ),
               ),
-            ),
+            ] else ...[
+              Text("Select Corresponding Lost Item", style: Theme.of(context).textTheme.labelLarge),
+              const SizedBox(height: 8),
+              StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance.collection('lost_items').where('type', isEqualTo: 'lost').where('status', isEqualTo: 'open').snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const SizedBox(height: 50, child: Center(child: CircularProgressIndicator()));
+                  }
+                  if (snapshot.hasError) {
+                    return Text("Error loading lost items.", style: TextStyle(color: Theme.of(context).colorScheme.error));
+                  }
+                  
+                  final docs = snapshot.data?.docs ?? [];
+                  if (docs.isEmpty) {
+                    return Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.amber),
+                      ),
+                      child: const Text("There are no open lost items. Please wait until someone reports a lost item before marking it found."),
+                    );
+                  }
+                  
+                  // Ensure selected item is valid relative to list
+                  if (selectedLostItemId != null && !docs.any((d) => d.id == selectedLostItemId)) {
+                    // Reset securely via scheduled callback to avoid setState during build
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) setState(() => selectedLostItemId = null);
+                    });
+                  }
+
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFDEE2E6)),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: selectedLostItemId,
+                        hint: const Text("Select the lost item you found"),
+                        isExpanded: true,
+                        items: docs.map((doc) {
+                          final data = doc.data() as Map<String, dynamic>;
+                          final title = (data['title'] ?? 'Unknown').toString();
+                          final loc = (data['location'] ?? 'Unknown location').toString();
+                          return DropdownMenuItem<String>(
+                            value: doc.id,
+                            child: Text("$title (Lost at: $loc)"),
+                            onTap: () {
+                              selectedLostItemData = data;
+                            },
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          setState(() {
+                            selectedLostItemId = val;
+                          });
+                        },
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
             
             const SizedBox(height: 24),
             CustomTextField(
               controller: locationController,
-              labelText: "Location found/lost",
+              labelText: selectedType == 'lost' ? "Location lost" : "Location found",
               hintText: "e.g., Library 2nd Floor",
               prefixIcon: const Icon(Icons.location_on_outlined),
             ),
@@ -182,7 +287,7 @@ class _ReportLostItemState extends State<ReportLostItem> {
             CustomTextField(
               controller: descriptionController,
               labelText: "Description (Optional)",
-              hintText: "Any identifying details...",
+              hintText: "Any identifying details or instructions...",
               maxLines: 4,
             ),
             

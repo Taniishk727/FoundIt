@@ -10,6 +10,7 @@ class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
   @override
+
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
@@ -48,12 +49,17 @@ class _LoginScreenState extends State<LoginScreen> {
     String email = "${studentId.toLowerCase()}@campus.local";
 
     try {
+      final stopwatch = Stopwatch()..start();
+
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
         password: password,
-      );
+      ).timeout(const Duration(seconds: 5));
 
-      await AppRole.loadForCurrentUser();
+      await AppRole.loadForCurrentUser().timeout(const Duration(seconds: 5));
+
+      stopwatch.stop();
+      debugPrint("Login query time: ${stopwatch.elapsedMilliseconds} ms");
 
       if (!mounted) return;
       Navigator.pushReplacement(
