@@ -263,6 +263,8 @@ class _ViewLostItemsState extends State<ViewLostItems> {
           itemBuilder: (context, index) {
             final doc = items[index];
             final data = doc.data() as Map<String, dynamic>;
+            final retrievedImageUrl = data['imageUrl'] as String?;
+            debugPrint("DEBUG: Retrieving Item: ${data['title']}, Image URL: $retrievedImageUrl");
 
             final isFound = type == 'found';
             final showClaim = isFound && !AppRole.isAdmin;
@@ -280,6 +282,7 @@ class _ViewLostItemsState extends State<ViewLostItems> {
                 title: (data['title'] ?? 'No title').toString(),
                 location: (data['location'] ?? 'Unknown location').toString(),
                 category: (data['category'] ?? 'Other').toString(),
+                imageUrl: data['imageUrl'] as String?,
                 showClaimButton: showClaim,
                 claimButtonEnabled: !_claimingItemIds.contains(doc.id) && !_claimedItemIds.contains(doc.id),
                 claimButtonText: _claimingItemIds.contains(doc.id) 

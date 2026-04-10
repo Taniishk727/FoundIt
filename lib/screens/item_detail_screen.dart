@@ -11,6 +11,8 @@ class ItemDetailScreen extends StatelessWidget {
     final description = itemData['description'] ?? 'No Description provided.';
     final location = itemData['location'] ?? 'Unknown location';
     final category = itemData['category'] ?? 'Other';
+    final imageUrl = itemData['imageUrl'] as String?;
+    debugPrint("DEBUG: ItemDetailScreen initialising for ${itemData['title']}, itemData: $itemData");
     
     return Scaffold(
       appBar: AppBar(title: Text(title)),
@@ -19,21 +21,22 @@ class ItemDetailScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              height: 200,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor.withOpacity(0.05),
+            if (imageUrl != null && imageUrl.isNotEmpty)
+              ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-              ),
-              child: Center(
-                child: Icon(
-                  Icons.image_not_supported_outlined,
-                  size: 64,
-                  color: Theme.of(context).primaryColor.withOpacity(0.5),
+                child: Image.network(
+                  imageUrl,
+                  height: 200,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    debugPrint("Error loading image in ItemDetailScreen: $error");
+                    return _buildPlaceholder(context);
+                  },
                 ),
-              ),
-            ),
+              )
+            else
+              _buildPlaceholder(context),
             const SizedBox(height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -81,6 +84,24 @@ class ItemDetailScreen extends StatelessWidget {
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.5),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlaceholder(BuildContext context) {
+    return Container(
+      height: 200,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Theme.of(context).primaryColor.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Center(
+        child: Icon(
+          Icons.image_not_supported_outlined,
+          size: 64,
+          color: Theme.of(context).primaryColor.withOpacity(0.5),
         ),
       ),
     );

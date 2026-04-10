@@ -4,6 +4,7 @@ class ItemCard extends StatelessWidget {
   final String title;
   final String location;
   final String category;
+  final String? imageUrl;
   final bool showClaimButton;
   final bool claimButtonEnabled;
   final String claimButtonText;
@@ -14,6 +15,7 @@ class ItemCard extends StatelessWidget {
     required this.title,
     required this.location,
     required this.category,
+    this.imageUrl,
     this.showClaimButton = true,
     this.claimButtonEnabled = true,
     this.claimButtonText = 'Claim',
@@ -29,19 +31,21 @@ class ItemCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Icon / placeholder image
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                _getCategoryIcon(category),
-                color: Theme.of(context).primaryColor,
-                size: 32,
-              ),
-            ),
+            imageUrl != null && imageUrl!.isNotEmpty
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.network(
+                      imageUrl!,
+                      width: 64,
+                      height: 64,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        debugPrint("Error loading image in ItemCard: $error");
+                        return _buildPlaceholder(context);
+                      },
+                    ),
+                  )
+                : _buildPlaceholder(context),
             const SizedBox(width: 16),
             // Details
             Expanded(
@@ -120,5 +124,21 @@ class ItemCard extends StatelessWidget {
       case 'keys': return Icons.vpn_key;
       default: return Icons.help_outline;
     }
+  }
+
+  Widget _buildPlaceholder(BuildContext context) {
+    return Container(
+      width: 64,
+      height: 64,
+      decoration: BoxDecoration(
+        color: Theme.of(context).primaryColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(
+        _getCategoryIcon(category),
+        color: Theme.of(context).primaryColor,
+        size: 32,
+      ),
+    );
   }
 }

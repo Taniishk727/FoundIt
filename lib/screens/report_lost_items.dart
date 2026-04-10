@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/primary_button.dart';
+import 'dart:convert';
+import 'dart:io';
+import 'package:http/http.dart' as http;
 
 class ReportLostItem extends StatefulWidget {
   const ReportLostItem({super.key});
@@ -32,6 +38,79 @@ class _ReportLostItemState extends State<ReportLostItem> {
 
   String? selectedLostItemId;
   Map<String, dynamic>? selectedLostItemData;
+  File? _selectedImage;
+  final ImagePicker _picker = ImagePicker();
+
+  Future<void> _pickImage() async {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera),
+              title: const Text('Camera'),
+              onTap: () async {
+                Navigator.of(ctx).pop();
+                final pickedFile = await _picker.pickImage(source: ImageSource.camera, imageQuality: 70);
+                if (pickedFile != null) setState(() => _selectedImage = File(pickedFile.path));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Gallery'),
+              onTap: () async {
+                Navigator.of(ctx).pop();
+                final pickedFile = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+                if (pickedFile != null) setState(() => _selectedImage = File(pickedFile.path));
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
+
+Future<String?> uploadImage(File imageFile) async {
+  try {
+    const cloudName = "dpexojfur"; 
+    const uploadPreset = "found_it_unsigned"; 
+
+    final url = Uri.parse(
+      "https://api.cloudinary.com/v1_1/$cloudName/image/upload",
+    );
+
+    debugPrint("📸 Uploading to Cloudinary: ${imageFile.path}");
+
+    final request = http.MultipartRequest('POST', url)
+      ..fields['upload_preset'] = uploadPreset
+      ..files.add(await http.MultipartFile.fromPath(
+        'file',
+        imageFile.path,
+      ));
+
+    final response = await request.send();
+
+    if (response.statusCode == 200) {
+      final responseData = await response.stream.bytesToString();
+      final jsonData = json.decode(responseData);
+
+      final imageUrl = jsonData['secure_url'];
+
+      debugPrint("🌐 Cloudinary URL: $imageUrl");
+
+      return imageUrl;
+    } else {
+      debugPrint("❌ Upload failed: ${response.statusCode}");
+      return null;
+    }
+  } catch (e) {
+    debugPrint("❌ Cloudinary error: $e");
+    return null;
+  }
+}
 
   void submitItem(BuildContext context) async {
     final currentUser = FirebaseAuth.instance.currentUser;
@@ -69,8 +148,28 @@ class _ReportLostItemState extends State<ReportLostItem> {
     });
 
     try {
+      final itemDocRef = FirebaseFirestore.instance.collection('lost_items').doc();
+      String? imageUrl;
+
+      if (_selectedImage != null) {
+  final file = File(_selectedImage!.path);
+
+  debugPrint("🧪 Checking file...");
+  debugPrint("PATH: ${file.path}");
+  debugPrint("EXISTS: ${file.existsSync()}");
+
+  if (file.existsSync()) {
+    imageUrl = await uploadImage(file);
+    debugPrint("DEBUG: Uploaded Image URL: $imageUrl");
+  } else {
+    debugPrint("❌ File invalid, skipping upload");
+  }
+}
+
+      debugPrint("DEBUG: Final imageUrl before saving to Firestore: ${imageUrl ?? 'null'}");
+
       if (selectedType == 'lost') {
-        await FirebaseFirestore.instance.collection('lost_items').add({
+        await itemDocRef.set({
           'title': titleController.text.trim(),
           'description': descriptionController.text.trim(),
           'location': locationController.text.trim(),
@@ -79,9 +178,10 @@ class _ReportLostItemState extends State<ReportLostItem> {
           'status': 'open',
           'created_at': FieldValue.serverTimestamp(),
           'reportedBy': currentUser.uid,
+          'imageUrl': imageUrl,
         });
       } else {
-        await FirebaseFirestore.instance.collection('lost_items').add({
+        await itemDocRef.set({
           'lostItemId': selectedLostItemId,
           'finderId': currentUser.uid,
           'reportedBy': currentUser.uid, // backward compat
@@ -92,6 +192,7 @@ class _ReportLostItemState extends State<ReportLostItem> {
           'type': 'found',
           'status': 'open',
           'created_at': FieldValue.serverTimestamp(),
+          'imageUrl': imageUrl ?? "",
         });
       }
 
@@ -109,6 +210,7 @@ class _ReportLostItemState extends State<ReportLostItem> {
         selectedType = "lost";
         selectedLostItemId = null;
         selectedLostItemData = null;
+        _selectedImage = null;
       });
       
     } catch (e) {
@@ -291,6 +393,44 @@ class _ReportLostItemState extends State<ReportLostItem> {
               maxLines: 4,
             ),
             
+            const SizedBox(height: 24),
+            Text("Image (Optional)", style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            if (_selectedImage != null)
+              Stack(
+                alignment: Alignment.topRight,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.file(
+                      _selectedImage!,
+                      height: 150,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.cancel, color: Colors.white),
+                    style: IconButton.styleFrom(backgroundColor: Colors.black54),
+                    onPressed: () {
+                      setState(() {
+                        _selectedImage = null;
+                      });
+                    },
+                  ),
+                ],
+              )
+            else
+              OutlinedButton.icon(
+                onPressed: _pickImage,
+                icon: const Icon(Icons.add_a_photo),
+                label: const Text("Upload Image"),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+
             const SizedBox(height: 32),
             PrimaryButton(
               text: "Submit Report",
