@@ -61,11 +61,11 @@ class _LoginScreenState extends State<LoginScreen> {
       stopwatch.stop();
       debugPrint("Login query time: ${stopwatch.elapsedMilliseconds} ms");
 
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const MainNavbar()),
-      );
+      // We do not need to call pushReplacement. StreamBuilder in main.dart handles it!
+      // If we are pushed on top of a stack, pop back to first route
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.popUntil(context, (route) => route.isFirst);
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

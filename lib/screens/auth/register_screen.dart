@@ -73,10 +73,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
         const SnackBar(content: Text("Registration Successful")),
       );
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const MainNavbar()),
-      );
+      // Registration signs the user in. authStateChanges stream will naturally route to MainNavbar.
+      // Pop everything to return to the root AuthWrapper.
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.popUntil(context, (route) => route.isFirst);
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

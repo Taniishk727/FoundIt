@@ -82,7 +82,7 @@ Future<String?> uploadImage(File imageFile) async {
       "https://api.cloudinary.com/v1_1/$cloudName/image/upload",
     );
 
-    debugPrint("📸 Uploading to Cloudinary: ${imageFile.path}");
+    debugPrint(" Uploading to Cloudinary: ${imageFile.path}");
 
     final request = http.MultipartRequest('POST', url)
       ..fields['upload_preset'] = uploadPreset
@@ -99,15 +99,15 @@ Future<String?> uploadImage(File imageFile) async {
 
       final imageUrl = jsonData['secure_url'];
 
-      debugPrint("🌐 Cloudinary URL: $imageUrl");
+      debugPrint(" Cloudinary URL: $imageUrl");
 
       return imageUrl;
     } else {
-      debugPrint("❌ Upload failed: ${response.statusCode}");
+      debugPrint(" Upload failed: ${response.statusCode}");
       return null;
     }
   } catch (e) {
-    debugPrint("❌ Cloudinary error: $e");
+    debugPrint(" Cloudinary error: $e");
     return null;
   }
 }
@@ -162,7 +162,7 @@ Future<String?> uploadImage(File imageFile) async {
     imageUrl = await uploadImage(file);
     debugPrint("DEBUG: Uploaded Image URL: $imageUrl");
   } else {
-    debugPrint("❌ File invalid, skipping upload");
+    debugPrint("File invalid, skipping upload");
   }
 }
 
