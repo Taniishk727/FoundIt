@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'auth/login_screen.dart';
 import 'package:lost_found_app/state/app_role.dart';
+import 'package:provider/provider.dart';
+import '../state/theme_provider.dart';
 import 'item_detail_screen.dart';
 
 class AdminPanel extends StatelessWidget {
@@ -35,8 +37,12 @@ class AdminPanel extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     radius: 48,
-                    backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
-                    child: Icon(Icons.person, size: 48, color: Theme.of(context).primaryColor),
+                    backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                    child: Icon(
+                      Icons.person,
+                      size: 48,
+                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    ),
                   ),
                   const SizedBox(height: 16),
                   Text(
@@ -46,7 +52,21 @@ class AdminPanel extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 48),
+            const SizedBox(height: 24),
+            Consumer<ThemeProvider>(
+              builder: (context, themeProvider, child) {
+                return SwitchListTile(
+                  title: const Text("Dark Mode"),
+                  value: themeProvider.isDarkMode,
+                  onChanged: (bool value) {
+                    themeProvider.toggleTheme(value);
+                  },
+                  secondary: const Icon(Icons.dark_mode),
+                  contentPadding: EdgeInsets.zero,
+                );
+              },
+            ),
+            const SizedBox(height: 16),
             Text(
               AppRole.isAdmin ? "System Overview (Admin)" : "Account",
               style: Theme.of(context)

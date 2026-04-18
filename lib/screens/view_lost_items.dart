@@ -330,7 +330,7 @@ class _ViewLostItemsState extends State<ViewLostItems> {
           children: [
             // Search & Filter Header
             Container(
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.surface,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Column(
                 children: [
@@ -371,9 +371,11 @@ class _ViewLostItemsState extends State<ViewLostItems> {
                                 selectedCategory = category;
                               });
                             },
-                            selectedColor: Theme.of(context).primaryColor.withOpacity(0.2),
+                            selectedColor: Theme.of(context).colorScheme.primaryContainer,
                             labelStyle: TextStyle(
-                              color: isSelected ? Theme.of(context).primaryColor : Theme.of(context).textTheme.bodyMedium?.color,
+                              color: isSelected
+                                  ? Theme.of(context).colorScheme.onPrimaryContainer
+                                  : Theme.of(context).colorScheme.onSurfaceVariant,
                               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                             ),
                             shape: RoundedRectangleBorder(

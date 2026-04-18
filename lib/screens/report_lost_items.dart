@@ -285,7 +285,7 @@ Future<String?> uploadImage(File imageFile) async {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Theme.of(context).colorScheme.surface,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: const Color(0xFFDEE2E6)),
                 ),
@@ -345,7 +345,7 @@ Future<String?> uploadImage(File imageFile) async {
                   return Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.surface,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: const Color(0xFFDEE2E6)),
                     ),
@@ -410,8 +410,8 @@ Future<String?> uploadImage(File imageFile) async {
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.cancel, color: Colors.white),
-                    style: IconButton.styleFrom(backgroundColor: Colors.black54),
+                    icon: Icon(Icons.cancel, color: Theme.of(context).colorScheme.onSurface),
+                    style: IconButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.surface.withValues(alpha: 0.7)),
                     onPressed: () {
                       setState(() {
                         _selectedImage = null;
