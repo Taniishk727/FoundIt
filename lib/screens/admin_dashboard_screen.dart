@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:lost_found_app/services/notification_service.dart';
 
 class AdminDashboardScreen extends StatelessWidget {
   const AdminDashboardScreen({super.key});
@@ -77,6 +78,16 @@ class AdminDashboardScreen extends StatelessWidget {
         debugPrint('Claim approval status update: lostItemId=$lostItemId SUCCESS. Resolved ${foundItemsQuery.docs.length} found item(s).');
       });
 
+      // Notify the claimant about approval
+      if (claimantId.isNotEmpty) {
+        NotificationService.sendInAppNotification(
+          userId: claimantId,
+          title: 'Claim Approved!',
+          body: 'Your claim for "${ (claimData['itemTitle'] ?? 'an item').toString() }" has been approved. You can now collect your item.',
+          type: 'claim_approved',
+        );
+      }
+
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Claim approved successfully')),
@@ -93,8 +104,21 @@ class AdminDashboardScreen extends StatelessWidget {
   Future<void> _rejectClaim({
     required BuildContext context,
     required DocumentReference claimRef,
+    required Map<String, dynamic> claimData,
   }) async {
     await claimRef.update({'status': 'rejected'});
+
+    // Notify the claimant about rejection
+    final claimantId = (claimData['claimantId'] ?? '').toString();
+    if (claimantId.isNotEmpty) {
+      NotificationService.sendInAppNotification(
+        userId: claimantId,
+        title: 'Claim Rejected',
+        body: 'Your claim for "${ (claimData['itemTitle'] ?? 'an item').toString() }" was rejected.',
+        type: 'claim_rejected',
+      );
+    }
+
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Claim rejected')),
@@ -169,6 +193,7 @@ class AdminDashboardScreen extends StatelessWidget {
                               onPressed: () => _rejectClaim(
                                 context: context,
                                 claimRef: doc.reference,
+                                claimData: data,
                               ),
                               style: TextButton.styleFrom(foregroundColor: Colors.red),
                               child: const Text('Reject'),

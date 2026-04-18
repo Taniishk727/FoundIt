@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/primary_button.dart';
-import 'package:lost_found_app/screens/main_navbar.dart';
 import 'package:lost_found_app/state/app_role.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -20,7 +19,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isLoading = false;
 
   bool isValidStudentId(String id) {
-    final regex = RegExp(r'^SF\d{2}IT\d{3}$');
+    final regex = RegExp(r'^[A-Za-z]{1,2}\d{2}[A-Za-z]{2,4}\d{2,3}$');
     return regex.hasMatch(id);
   }
 
@@ -31,7 +30,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     if (!isValidStudentId(studentId)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Invalid Student ID format (e.g., SF24IT253)")),
+        const SnackBar(content: Text("Invalid PRN format (e.g., F24IT256)")),
       );
       return;
     }
@@ -113,15 +112,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  "Register with your strict Student ID",
+                  "Register with your college PRN",
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 48),
                 CustomTextField(
                   controller: studentIdController,
-                  labelText: "Student ID",
-                  hintText: "SF24IT253",
+                  labelText: "PRN (Student ID)",
+                  hintText: "F24IT256",
                   prefixIcon: const Icon(Icons.badge_outlined),
                 ),
                 CustomTextField(
