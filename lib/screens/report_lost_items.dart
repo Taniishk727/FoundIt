@@ -9,6 +9,7 @@ import '../../widgets/primary_button.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:lost_found_app/services/notification_service.dart';
 
 class ReportLostItem extends StatefulWidget {
   const ReportLostItem({super.key});
@@ -194,6 +195,34 @@ Future<String?> uploadImage(File imageFile) async {
           'created_at': FieldValue.serverTimestamp(),
           'imageUrl': imageUrl ?? "",
         });
+      }
+
+      // ── Send notifications ──
+      if (selectedType == 'lost') {
+        // Broadcast to all users: someone lost something
+        NotificationService.broadcastNotification(
+          title: 'New Lost Item Reported',
+          body: '"${titleController.text.trim()}" lost at ${locationController.text.trim()}',
+          type: 'item_lost',
+          excludeUserId: currentUser.uid,
+        );
+      } else {
+        // Notify the original lost‑item reporter that someone found it
+        if (selectedLostItemId != null) {
+          final lostSnap = await FirebaseFirestore.instance
+              .collection('lost_items')
+              .doc(selectedLostItemId)
+              .get();
+          final originalReporter = lostSnap.data()?['reportedBy']?.toString();
+          if (originalReporter != null && originalReporter != currentUser.uid) {
+            NotificationService.sendInAppNotification(
+              userId: originalReporter,
+              title: 'Someone May Have Found Your Item!',
+              body: '"${selectedLostItemData?['title'] ?? 'Your item'}" may have been found at ${locationController.text.trim()}',
+              type: 'item_found',
+            );
+          }
+        }
       }
 
       if (!mounted) return;

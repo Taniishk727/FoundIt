@@ -1,29 +1,45 @@
+
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'state/theme_provider.dart';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'firebase_options.dart';
+
 import 'screens/auth/login_screen.dart';
 import 'screens/splash_screen.dart';
 import 'screens/main_navbar.dart';
+
 import 'package:lost_found_app/state/app_role.dart';
 import 'package:lost_found_app/theme/app_theme.dart';
+import 'package:lost_found_app/services/notification_service.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  
-  final prefs = await SharedPreferences.getInstance();
-  
-  debugPrint("APP STARTED. Initial User: ${FirebaseAuth.instance.currentUser?.uid}");
-  
-  runApp(
-    ChangeNotifierProvider(
-      create: (_) => ThemeProvider(prefs),
-      child: const MyApp(),
-    ),
-  );
+final sharedPreferences = await SharedPreferences.getInstance();
+
+// Register the background message handler (mobile only – not supported on web)
+if (!kIsWeb) {
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+}
+
+// Initialize the notification service
+await NotificationService.instance.initialize();
+
+debugPrint("APP STARTED. Initial User: ${FirebaseAuth.instance.currentUser?.uid}");
+
+runApp(
+  ChangeNotifierProvider(
+    create: (_) => ThemeProvider(sharedPreferences),
+    child: const MyApp(),
+  ),
+);
 }
 
 class MyApp extends StatelessWidget {
@@ -70,6 +86,8 @@ class AuthWrapper extends StatelessWidget {
           if (AppRole.role.value == null) {
             AppRole.loadForCurrentUser();
           }
+          // Save / refresh the FCM token for this user
+          NotificationService.instance.saveTokenForUser();
           return const MainNavbar();
         }
 
@@ -78,4 +96,3 @@ class AuthWrapper extends StatelessWidget {
     );
   }
 }
-

@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../widgets/item_card.dart';
 import 'item_detail_screen.dart';
 import 'package:lost_found_app/state/app_role.dart';
+import 'package:lost_found_app/services/notification_service.dart';
 
 class ViewLostItems extends StatefulWidget {
   const ViewLostItems({super.key});
@@ -148,6 +149,21 @@ class _ViewLostItemsState extends State<ViewLostItems> {
       setState(() {
         _claimedItemIds.add(foundItemId);
       });
+
+      // Notify the item reporter about the new claim
+      final foundItemSnap = await FirebaseFirestore.instance
+          .collection('lost_items')
+          .doc(foundItemId)
+          .get();
+      final reporterId = foundItemSnap.data()?['reportedBy']?.toString();
+      if (reporterId != null && reporterId != currentUser.uid) {
+        NotificationService.sendInAppNotification(
+          userId: reporterId,
+          title: 'New Claim on Your Item',
+          body: 'Someone has submitted a claim for "$itemTitle".',
+          type: 'claim_submitted',
+        );
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Claim request sent successfully")),
