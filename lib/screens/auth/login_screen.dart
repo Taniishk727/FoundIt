@@ -20,7 +20,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _isAdminLogin = false; // Toggle between student and admin login
 
-  // PRN format: letter(s) followed by 2 digits, then department letters, then 3 digits
+  // PRN format: letter followed by 2 digits, then department letters, then 3 digits
   // Examples: F24IT256, SF24IT253, F23CS101
   bool isValidStudentId(String id) {
     final regex = RegExp(r'^[A-Za-z]{1,2}\d{2}[A-Za-z]{2,4}\d{2,3}$');
@@ -199,7 +199,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 32),
 
                 if (!_isAdminLogin) ...[
-                  // ─── Student Login ───
+                  // Student Login
                   CustomTextField(
                     controller: studentIdController,
                     labelText: "PRN (Student ID)",
@@ -238,7 +238,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
                 ] else ...[
-                  // ─── Admin Login ───
+                  // Admin Login
                   CustomTextField(
                     controller: adminIdController,
                     labelText: "Admin ID",

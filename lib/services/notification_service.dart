@@ -3,7 +3,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-// Conditionally import local notifications (not supported on web)
+// Conditionally import local notifications 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 /// Top‑level handler required by FCM for background/terminated messages.
@@ -69,7 +69,7 @@ class NotificationService {
     }
   }
 
-  // ─── Token Management ───────────────────────────────────────────────
+  //  Token Management 
 
   /// Persist the current FCM token to the user's Firestore document.
   /// Call after login / when authState changes to logged-in.
@@ -103,7 +103,7 @@ class NotificationService {
     }
   }
 
-  // ─── Local Notification Display ─────────────────────────────────────
+  //  Local Notification Display 
 
   void _showLocalNotification(RemoteMessage message) {
     final notification = message.notification;
@@ -132,7 +132,7 @@ class NotificationService {
     );
   }
 
-  // ─── In-App Notification Writer ─────────────────────────────────────
+  //  In-App Notification Writer 
 
   /// Write a notification document to Firestore so it appears in the
   /// Alerts / Notifications tab for the target user.
@@ -186,7 +186,7 @@ class NotificationService {
     debugPrint('[Notif] Broadcast notification sent: $title');
   }
 
-  // ─── Helpers ────────────────────────────────────────────────────────
+  //  Helpers 
 
   /// Mark a single notification as read.
   static Future<void> markAsRead(String notificationId) async {

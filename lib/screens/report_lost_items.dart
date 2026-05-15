@@ -197,7 +197,7 @@ Future<String?> uploadImage(File imageFile) async {
         });
       }
 
-      // ── Send notifications ──
+      //  Send notifications after successful report creation
       if (selectedType == 'lost') {
         // Broadcast to all users: someone lost something
         NotificationService.broadcastNotification(
@@ -207,7 +207,7 @@ Future<String?> uploadImage(File imageFile) async {
           excludeUserId: currentUser.uid,
         );
       } else {
-        // Notify the original lost‑item reporter that someone found it
+        // Notify the original lost item reporter that someone found it
         if (selectedLostItemId != null) {
           final lostSnap = await FirebaseFirestore.instance
               .collection('lost_items')

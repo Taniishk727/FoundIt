@@ -19,7 +19,7 @@ class ClaimsRequestsScreen extends StatelessWidget {
     if (itemId != null && itemId!.trim().isNotEmpty) {
       query = query.where('itemId', isEqualTo: itemId);
     } else {
-      // Default view: show *my* claim requests (claimant view)
+      // Default view: show my claim requests (claimant view)
       query = query.where('claimantId', isEqualTo: currentUser.uid);
     }
 

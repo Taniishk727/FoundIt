@@ -55,19 +55,18 @@ class AdminDashboardScreen extends StatelessWidget {
           throw StateError('Lost item is already claimed or not open');
         }
 
-        // 3. Verify fetched found items within transaction (optional, but good for locks)
-        // We'll just perform the writes.
+        
 
-        // 4. Update claim: status = "approved"
+        // 3. Update claim: status = "approved"
         tx.update(fetchedClaimRef, {'status': 'approved'});
 
-        // 5. Update lost item
+        // 4. Update lost item
         tx.update(lostItemRef, {
           'status': 'claimed',
           'claimedBy': claimantId,
         });
 
-        // 6. Update ALL associated found items to hide them
+        // 5. Update ALL associated found items to hide them
         for (var doc in foundItemsQuery.docs) {
           tx.update(doc.reference, {
             'status': 'claimed',

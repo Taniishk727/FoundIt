@@ -1,0 +1,32 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+
+    // Users collection rules
+    match /users/{userId} {
+      // Allow unauthenticated read so login_screen can look up the admin email via EMPXXX
+      allow read: if true;
+      
+      // Clients can only create users representing students (role == 'user'). 
+      // Admin accounts are exclusively created via the Firebase Console manually.
+      allow create: if request.auth != null && 
+                       request.auth.uid == userId && 
+                       request.resource.data.role == 'user';
+      
+      // Prevent privilege escalation in updates:
+      // A user can update their profile but NOT their role. Only an admin can update roles.
+      allow update: if request.auth != null && (
+        (request.auth.uid == userId && request.resource.data.role == resource.data.role) ||
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+      
+      allow delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Default rule for all other existing app collections
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
